@@ -126,20 +126,20 @@ class DDPG(object):
     
     def get_training_data(self,batch):
         states = np.array([x for x in batch[:,0]])
-		actions = np.array([x for x in batch[:, 1]])
-		rewards = np.array([x for x in batch[:, 2]])
-		new_states = np.array([x for x in batch[:, 3]])
-		dones = np.array([int(not(x)) for x in batch[:, 4]])
+	    actions = np.array([x for x in batch[:, 1]])
+	    rewards = np.array([x for x in batch[:, 2]])
+	    new_states = np.array([x for x in batch[:, 3]])
+	    dones = np.array([int(not(x)) for x in batch[:, 4]])
 
         states = np.array(states,ndim = 2)
         actions = np.array(actions,ndim = 2)
         new_states = np.array(new_states,ndim = 2)
         q_values_curr_state =  self.critic.model.predict([states,actions])
         q_values_next_state = self.critic.target_model.predict([new_states,self.actor.target_model.predict(new_states)])
-		targets = q_values_next_state
-			
-		a = np.multiply( self.gamma * q_values_next_state, dones)
-		targets[np.arange(self.batch_size), actions] = rewards + a 
+	    targets = q_values_next_state
+    
+	    a = np.multiply( self.gamma * q_values_next_state, dones)
+	    targets[np.arange(self.batch_size), actions] = rewards + a 
 
         return states,actions,targets,q_values_curr_state
 
