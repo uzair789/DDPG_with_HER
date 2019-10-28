@@ -12,7 +12,8 @@ GAMMA = 0.98                    # Discount for rewards.
 TAU = 0.05                      # Target network update rate.
 LEARNING_RATE_ACTOR = 0.0001
 LEARNING_RATE_CRITIC = 0.001
-output_folder = './Results'
+OUTPUT_PATH = './Results'
+NUM_EPISODES = 50000
 
 
 class EpsilonNormalActionNoise(object):
@@ -54,6 +55,7 @@ class DDPG(object):
             env: an instance of gym.Env on which we aim to learn a policy.
             outfile_name: (str) name of the output filename.
         """
+        self.OUTPUT_PATH = outfile_name
         self.action_dim = len(env.action_space.low)
         self.state_dim = len(env.observation_space.low)
         np.random.seed(1337)
@@ -172,6 +174,10 @@ class DDPG(object):
             num_episodes: (int) Number of training episodes.
             hindsight: (bool) Whether to use HER.
         """
+        if hindsight:
+            suffix = 'HER'+'_'+str(self.gamma)+'_'+str(self.tau)
+        else:
+            suffix = 'DDPG'+'_'+str(self.gamma)+'_'+str(self.tau)
         x = []
         train_loss = []
         train_rewards = []
@@ -229,6 +235,8 @@ class DDPG(object):
                 val_mean_rewards.append(mean_rewards)
                 val_std_rewards.append(std_rewards)
 
+        self.model.save_weights(os.path.join(self.OUTPUT_PATH, suffix+'_model.h5'))
+
         self.plot_graph(train_rewards, suffix+'_Episode_rewards', 'Episodes', 'Training Rewards')
         self.plot_graph(train_loss, suffix+'_Training_loss', 'Episodes', 'Training Loss')
         self.plot_errorbar(x, val_mean_rewards, val_std_rewards, suffix+'_mean_val_rewards', 'Episodes', 'Val Rewards', label='std')
@@ -246,4 +254,6 @@ class DDPG(object):
 
 
 if __name__ == '__main__':
-    ddpg = 
+    env = gym.make('Pushing2D-v0')
+    ddpg = DDPG(env, OUTPUT_PATH)
+    ddpg.train(NUM_EPISODES,False)
