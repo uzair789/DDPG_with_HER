@@ -17,7 +17,11 @@ def create_actor_network(state_size, action_size):
         state_input: a tf.placeholder for the batched state.
     """
     state_input = Input(shape=[state_size])
-    raise NotImplementedError
+
+    x = Dense(HIDDEN1_UNITS, activation = 'tanh', input_shape=(action_size,))
+	state_output = Dense(HIDDEN2_UNITS, activation = 'tanh' )
+    model = Model(inputs=state_input, output=state_output)
+    return model,state_input
 
 
 class ActorNetwork(object):
@@ -35,7 +39,15 @@ class ActorNetwork(object):
             tau: (float) the target net update rate.
             learning_rate: (float) learning rate for the critic.
         """
-        raise NotImplementedError
+        self.model, self.state_input = create_actor_network(state_size, action_size)
+        self.target_model,_ = create_actor_network(state_size, action_size) 
+        self.batch_size = batch_size
+        self.tau = tau
+        self.lr = learning_rate
+        self.action_grads = tf.placeholder(tf.float32,[None, action_size])
+        self.params_grad = tf.gradients(self.model.output, self.model.trainable_weights, -self.action_grads)
+        self.grads = zip(self.params_grad, self.model.trainable_weights)
+        self.optimize = tf.train.AdamOptimizer(self.lr).apply_gradients(self.grads)
         self.sess = sess
         self.sess.run(tf.initialize_all_variables())
 
@@ -47,9 +59,18 @@ class ActorNetwork(object):
             actions: a batched numpy array storing the actions.
             action_grads: a batched numpy array storing the
                 gradients dQ(s, a) / da.
-        """
-        raise NotImplementedError
+        """        
+        self.sess.run(self.optimize, feed_dict={
+            self.state_input: states,
+            self.action_grads: action_grads
+        })
+        # raise NotImplementedError
 
     def update_target(self):
+        weights = self.model.get_weights()
+        target_weights = self.target_model.get_weights()
+        for i in xrange(len(weights)):
+            target_weights[i] = self.tau * weights[i] + (1 - self.tau)* target_weights[i]
+        self.target_model.set_weights(target_weights)
         """Updates the target net using an update rate of tau."""
-        raise NotImplementedError
+        # raise NotImplementedError
