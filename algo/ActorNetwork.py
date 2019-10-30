@@ -19,7 +19,7 @@ def create_actor_network(state_size, action_size):
     state_input = Input(shape=[state_size])
 
     x = Dense(HIDDEN1_UNITS, activation = 'tanh', input_shape=(action_size,))
-	state_output = Dense(HIDDEN2_UNITS, activation = 'tanh' )
+    state_output = Dense(HIDDEN2_UNITS, activation = 'tanh' )
     model = Model(inputs=state_input, output=state_output)
     return model,state_input
 

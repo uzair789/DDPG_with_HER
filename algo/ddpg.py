@@ -1,10 +1,13 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+import gym
+import pdb
 
-from .ReplayBuffer import ReplayBuffer
-from .ActorNetwork import ActorNetwork
-from .CriticNetwork import CriticNetwork
+import envs
+from ReplayBuffer import ReplayBuffer
+from ActorNetwork import ActorNetwork
+from CriticNetwork import CriticNetwork
 
 BUFFER_SIZE = 1000000
 BATCH_SIZE = 1024
