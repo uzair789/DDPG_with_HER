@@ -233,6 +233,15 @@ class DDPG(object):
         self.plot_graph(train_loss, suffix+'_Training_loss', 'Episodes', 'Training Loss')
         self.plot_errorbar(x, val_mean_rewards, val_std_rewards, suffix+'_mean_val_rewards', 'Episodes', 'Val Rewards', label='std')
 
+    def add_to_buffer(self, states, rewards, actions):
+        done = False
+        for t in range(len(actions)):
+            if t == len(actions)-1:
+                done = True
+            self.re.add(states_ser[t], action[t], rewards_ser[t], states_ser[t+1], done)
+
+    # def sample_additional_goals(self, states, actions, strategy='future'):
+        
 
 
     def add_hindsight_replay_experience(self, states, actions):
@@ -242,8 +251,45 @@ class DDPG(object):
             states: a list of states.
             actions: a list of states.
         """
-        raise NotImplementedError
+        # compute the rewards for the current goal
+        states_ser, rewards_ser = self.env.apply_hindsight(states)
 
+        # we now have the states,rewards and actions to add to the buffer. I think there will be one action less than the st        # ates and rewards
+        self.add_to_buffer(states_ser, rewards_ser, actions)
+        
+        '''
+        # we sample additional goals (-future, episode, random)
+        additional_goals = sample_additional_goals(states, actions, strategy='future')
+
+
+        # get sets of states and rewards for each goal and add to the buffer
+        for g in additional_goals:
+            states[-1] = g
+            states_her, rewards_her = self.env.apply_hindsight(states)
+
+            # add the additional transitions to the buffer
+            self.add_to_buffer(states_her, rewards_her, actions)
+        '''
+
+
+
+    def burn_in():
+        """ Burn to fill the buffer
+        """
+        # get some episodes, and add to the hindsight
+
+
+
+
+
+
+
+
+
+
+ 
 
 if __name__ == '__main__':
-    ddpg = 
+    env = Pusher2d()
+    ddpg = DDPG(env, out_filename='')
+    ddpg.burn_in()
