@@ -1,13 +1,15 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+from tensorflow.keras.layers import add
 import gym
 import pdb
 
+
 import envs
-from ReplayBuffer import ReplayBuffer
-from ActorNetwork import ActorNetwork
-from CriticNetwork import CriticNetwork
+from .ReplayBuffer import ReplayBuffer
+from .ActorNetwork import ActorNetwork
+from .CriticNetwork import CriticNetwork
 
 BUFFER_SIZE = 1000000
 BATCH_SIZE = 1024
@@ -17,7 +19,7 @@ LEARNING_RATE_ACTOR = 0.0001
 LEARNING_RATE_CRITIC = 0.001
 OUTPUT_PATH = './Results'
 NUM_EPISODES = 50000
-
+outfile = './Results/logfile.txt'
 
 class EpsilonNormalActionNoise(object):
     """A class for adding noise to the actions for exploration."""
@@ -59,6 +61,7 @@ class DDPG(object):
             outfile_name: (str) name of the output filename.
         """
         self.OUTPUT_PATH = outfile_name
+        self.outfile = outfile
         self.action_dim = len(env.action_space.low)
         self.state_dim = len(env.observation_space.low)
         np.random.seed(1337)
@@ -66,10 +69,12 @@ class DDPG(object):
         self.sess = tf.Session()
         tf.keras.backend.set_session(self.sess)
         self.gamma = GAMMA
+        self.tau = TAU
+        self.batch_size = BATCH_SIZE
         self.actor = ActorNetwork(sess = self.sess, state_size =  self.state_dim, action_size = self.action_dim,
-                                     batch_size = BATCH_SIZE, tau = TAU, learning_rate = LEARNING_RATE_ACTOR)
+                                     batch_size = self.batch_size, tau = self.tau, learning_rate = LEARNING_RATE_ACTOR)
         self.critic = CriticNetwork(sess = self.sess, state_size = self.state_dim, action_size = self.action_dim,
-                                     batch_size = BATCH_SIZE,tau = TAU, learning_rate = LEARNING_RATE_CRITIC)
+                                     batch_size = self.batch_size,tau = self.tau, learning_rate = LEARNING_RATE_CRITIC)
         self.replay_mem = ReplayBuffer(buffer_size = BUFFER_SIZE)
         self.sample_noise = EpsilonNormalActionNoise(mu = 0, sigma = 1, epsilon = 0.1)
         # raise NotImplementedError
@@ -133,21 +138,22 @@ class DDPG(object):
         rewards = np.array([x for x in batch[:, 2]])
         new_states = np.array([x for x in batch[:, 3]])
         dones = np.array([int(not(x)) for x in batch[:, 4]])
-        
-        states = np.array(states,ndim = 2)
-        actions = np.array(actions,ndim = 2)
-        new_states = np.array(new_states,ndim = 2)
+
+        # states = np.array(states,ndim = 2)
+        # actions = np.array(actions,ndim = 2)
+        # new_states = np.array(new_states,ndim = 2)
+        states = np.squeeze(states,axis = 1)
+        dones = np.expand_dims(dones,axis = 1)
+        rewards = np.expand_dims(rewards,axis = 1)
         q_values_curr_state =  self.critic.model.predict([states,actions])
         q_values_next_state = self.critic.target_model.predict([new_states,self.actor.target_model.predict(new_states)])
         targets = q_values_next_state
-        
-        a = np.multiply( self.gamma * q_values_next_state, dones)
-        targets[np.arange(self.batch_size), actions] = rewards + a 
-        
+        out = np.multiply(self.gamma,np.multiply(q_values_next_state, dones))
+        targets = rewards + out 
         return states,actions,targets,q_values_curr_state
 
     def update_models(self,states,actions,critic_targets):
-        self.critic.model.train_on_batch(states,actions,critic_targets)
+        self.critic.model.train_on_batch([states,actions],critic_targets)
         actions = self.actor.model.predict(states)
         grads = self.critic.gradients(states, actions)
         self.actor.train(states, np.array(grads).reshape((-1, self.action_dim)))
@@ -196,20 +202,24 @@ class DDPG(object):
             store_states = []
             store_actions = []
             while not done:
+                state = np.expand_dims(state,axis=0)
                 act = self.actor.model.predict(state) 
                 action = act + self.sample_noise(act)
+                action = np.squeeze(action, axis = 0)
                 next_state, reward, done, info = self.env.step(action)
                 store_states.append(state)
                 store_actions.append(action)
                 self.replay_mem.add(state = state, action = action, reward = reward, new_state = next_state, done = done)
-                batch = self.replay_mem.get_batch(batch_size = BATCH_SIZE)
-                pdb.set_trace()
+                batch =np.array(self.replay_mem.get_batch(batch_size = BATCH_SIZE))
                 states,actions,critic_targets,q_val = self.get_training_data(batch)
                 self.update_models(states,actions,critic_targets)
                 state = next_state
                 total_reward += reward
-                step += 1
-                loss += tf.keras.losses.MSE(critic_targets,q_val)
+                step += 1  
+                # temp = tf.keras.losses.MSE(critic_targets,q_val)
+                temp = self.sess.run(
+                            tf.reduce_sum(tf.pow(critic_targets - q_val, 2)) / (critic_targets.shape[0])) 
+                loss += temp
                 # Collect one episode of experience, saving the states and actions
                 # to store_states and store_actions, respectively.
                 # raise NotImplementedError

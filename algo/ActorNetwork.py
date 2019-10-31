@@ -18,9 +18,10 @@ def create_actor_network(state_size, action_size):
     """
     state_input = Input(shape=[state_size])
 
-    x = Dense(HIDDEN1_UNITS, activation = 'tanh', input_shape=(action_size,))
-    state_output = Dense(HIDDEN2_UNITS, activation = 'tanh' )
-    model = Model(inputs=state_input, output=state_output)
+    x = Dense(HIDDEN1_UNITS, activation = 'relu', input_shape=(action_size,))(state_input)
+    x = Dense(HIDDEN2_UNITS, activation = 'relu' )(x)
+    state_output = Dense(action_size, activation= 'sigmoid')(x)
+    model = Model(inputs=state_input, outputs=state_output)
     return model,state_input
 
 
@@ -69,7 +70,7 @@ class ActorNetwork(object):
     def update_target(self):
         weights = self.model.get_weights()
         target_weights = self.target_model.get_weights()
-        for i in xrange(len(weights)):
+        for i in range(len(weights)):
             target_weights[i] = self.tau * weights[i] + (1 - self.tau)* target_weights[i]
         self.target_model.set_weights(target_weights)
         """Updates the target net using an update rate of tau."""
