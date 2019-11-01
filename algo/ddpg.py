@@ -198,7 +198,7 @@ class DDPG(object):
         plt.ylabel(ylabel)
         plt.savefig(os.path.join(self.OUTPUT_PATH, title+'.png'))
 
-    def train(self, num_episodes, hindsight=False):
+    def train(self, num_episodes, hindsight=True):
         """Runs the DDPG algorithm.
 
         Args:
