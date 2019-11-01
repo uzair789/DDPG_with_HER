@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.layers import add
 import gym
 import pdb
-
+import os
 
 import envs
 from .ReplayBuffer import ReplayBuffer
@@ -14,12 +14,12 @@ from .CriticNetwork import CriticNetwork
 BUFFER_SIZE = 1000000
 BATCH_SIZE = 1024
 GAMMA = 0.98                    # Discount for rewards.
-TAU = 0.05                      # Target network update rate.
+TAU = 0.05                     # Target network update rate.
 LEARNING_RATE_ACTOR = 0.0001
 LEARNING_RATE_CRITIC = 0.001
 OUTPUT_PATH = './Results'
-NUM_EPISODES = 50000
-outfile = './Results/logfile.txt'
+NUM_EPISODES = 5000
+outfile = './Results/ddpg_log.txt'
 
 class EpsilonNormalActionNoise(object):
     """A class for adding noise to the actions for exploration."""
@@ -45,7 +45,7 @@ class EpsilonNormalActionNoise(object):
             noisy_action: a batched tensor storing the action.
         """
         if np.random.uniform() > self.epsilon:
-            return action + np.random.normal(self.mu, self.sigma)
+            return action + np.random.normal(action+self.mu, self.sigma)
         else:
             return np.random.uniform(-1.0, 1.0, size=action.shape)
 
@@ -64,22 +64,24 @@ class DDPG(object):
         self.outfile = outfile
         self.action_dim = len(env.action_space.low)
         self.state_dim = len(env.observation_space.low)
+        self.burn_in = 5000
         np.random.seed(1337)
         self.env = env
         self.sess = tf.Session()
-        tf.keras.backend.set_session(self.sess)
         self.gamma = GAMMA
         self.tau = TAU
         self.batch_size = BATCH_SIZE
+        self.lr = LEARNING_RATE_CRITIC
         self.actor = ActorNetwork(sess = self.sess, state_size =  self.state_dim, action_size = self.action_dim,
                                      batch_size = self.batch_size, tau = self.tau, learning_rate = LEARNING_RATE_ACTOR)
         self.critic = CriticNetwork(sess = self.sess, state_size = self.state_dim, action_size = self.action_dim,
                                      batch_size = self.batch_size,tau = self.tau, learning_rate = LEARNING_RATE_CRITIC)
         self.replay_mem = ReplayBuffer(buffer_size = BUFFER_SIZE)
-        self.sample_noise = EpsilonNormalActionNoise(mu = 0, sigma = 1, epsilon = 0.1)
+        self.sample_noise = EpsilonNormalActionNoise(mu = 0,sigma = 0.01, epsilon = 0.1)
+        tf.keras.backend.set_session(self.sess)
         # raise NotImplementedError
 
-    def evaluate(self, num_episodes):
+    def evaluate(self, num_episodes,episode):
         """Evaluate the policy. Noise is not added during evaluation.
 
         Args:
@@ -129,8 +131,26 @@ class DDPG(object):
                     plt.legend(loc='lower left', fontsize=28, ncol=3, bbox_to_anchor=(0.1, 1.0))
                 if i == 8:
                     # Comment out the line below to disable plotting.
-                    plt.show()
+                    plt.savefig(os.path.join(self.OUTPUT_PATH,'plots','ep'+str(episode)+'_'+str(num_episodes)+'.png'))
         return np.mean(success_vec), np.mean(test_rewards), np.std(test_rewards)
+    
+    def burn_in_memory(self):
+	    # Initialize your replay memory with a burn_in number of episodes / transitions.
+        transition_count = 0
+        print(self.burn_in)
+        while(transition_count <= self.burn_in):
+            state = self.env.reset()
+            done = False
+            if not done and transition_count <= self.burn_in:
+                state = np.expand_dims(state,axis=0)
+                act = self.env.action_space.sample() 
+                action = act + self.sample_noise(act)
+                next_state, reward, done, info = self.env.step(action)
+                self.replay_mem.add(state = state, action = action, reward = reward, new_state = next_state, done = done)
+                state = next_state
+                transition_count += 1
+        print('Done burn in')
+        print(transition_count)
     
     def get_training_data(self,batch):
         states = np.array([x for x in batch[:,0]])
@@ -138,7 +158,7 @@ class DDPG(object):
         rewards = np.array([x for x in batch[:, 2]])
         new_states = np.array([x for x in batch[:, 3]])
         dones = np.array([int(not(x)) for x in batch[:, 4]])
-
+        # pdb.set_trace()
         # states = np.array(states,ndim = 2)
         # actions = np.array(actions,ndim = 2)
         # new_states = np.array(new_states,ndim = 2)
@@ -153,28 +173,30 @@ class DDPG(object):
         return states,actions,targets,q_values_curr_state
 
     def update_models(self,states,actions,critic_targets):
-        self.critic.model.train_on_batch([states,actions],critic_targets)
-        actions = self.actor.model.predict(states)
-        grads = self.critic.gradients(states, actions)
-        self.actor.train(states, np.array(grads).reshape((-1, self.action_dim)))
+        # pdb.set_trace()
+        loss = self.critic.model.train_on_batch([states,actions],critic_targets)
+        actions1 = self.actor.model.predict(states)
+        grads = self.critic.gradients(states, actions1)
+        self.actor.train(states, grads)
         self.actor.update_target()
         self.critic.update_target()
+        return loss
 
-    def plot_graph(data, title, xlabel, ylabel):
+    def plot_graph(self,data, title, xlabel, ylabel):
         plt.figure(figsize=(12,5))
         plt.title(title)
         plt.plot(data)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
-        plt.savefig(os.path.join(OUTPUT_PATH,title+'.png'))
+        plt.savefig(os.path.join(self.OUTPUT_PATH,title+'.png'))
 
-    def plot_errorbar(x, y, yerr, title, xlabel, ylabel, label=None):
+    def plot_errorbar(self,x, y, yerr, title, xlabel, ylabel, label=None):
         plt.figure(figsize=(12,5))
         plt.title(title)
         plt.errorbar(x, y, yerr, label=label)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
-        plt.savefig(os.path.join(OUTPUT_PATH, title+'.png'))
+        plt.savefig(os.path.join(self.OUTPUT_PATH, title+'.png'))
 
     def train(self, num_episodes, hindsight=False):
         """Runs the DDPG algorithm.
@@ -184,14 +206,16 @@ class DDPG(object):
             hindsight: (bool) Whether to use HER.
         """
         if hindsight:
-            suffix = 'HER'+'_'+str(self.gamma)+'_'+str(self.tau)
+            suffix = 'HER'+'_'+str(self.gamma)+'_'+str(self.tau)+'_'+str(self.lr)
         else:
-            suffix = 'DDPG'+'_'+str(self.gamma)+'_'+str(self.tau)
+            suffix = 'DDPG'+'_'+str(self.gamma)+'_'+str(self.tau)+'_'+str(self.lr)
         x = []
         train_loss = []
         train_rewards = []
         val_mean_rewards = []
         val_std_rewards = []
+        success_eval = []
+        self.burn_in_memory()
         for i in range(num_episodes):
             state = self.env.reset()
             s_t = np.array(state)
@@ -210,15 +234,15 @@ class DDPG(object):
                 store_states.append(state)
                 store_actions.append(action)
                 self.replay_mem.add(state = state, action = action, reward = reward, new_state = next_state, done = done)
-                batch =np.array(self.replay_mem.get_batch(batch_size = BATCH_SIZE))
-                states,actions,critic_targets,q_val = self.get_training_data(batch)
-                self.update_models(states,actions,critic_targets)
                 state = next_state
                 total_reward += reward
                 step += 1  
                 # temp = tf.keras.losses.MSE(critic_targets,q_val)
-                temp = self.sess.run(
-                            tf.reduce_sum(tf.pow(critic_targets - q_val, 2)) / (critic_targets.shape[0])) 
+                batch =np.array(self.replay_mem.get_batch(batch_size = BATCH_SIZE))
+                states,actions,critic_targets,q_val = self.get_training_data(batch)
+                temp = self.update_models(states,actions,critic_targets)
+                # temp = self.sess.run(
+                #             tf.reduce_sum(tf.pow(critic_targets - q_val, 2)) / (critic_targets.shape[0])) 
                 loss += temp
                 # Collect one episode of experience, saving the states and actions
                 # to store_states and store_actions, respectively.
@@ -240,20 +264,25 @@ class DDPG(object):
             print("\tTD loss = %.2f" % (loss / step,))
             print("\tSteps = %d; Info = %s" % (step, info['done']))
             if i % 100 == 0:
-                successes, mean_rewards, std_rewards = self.evaluate(10)
+                successes, mean_rewards, std_rewards = self.evaluate(10,i)
                 print('Evaluation: success = %.2f; return = %.2f' % (successes, mean_rewards))
                 with open(self.outfile, "a") as f:
                     f.write("%.2f, %.2f,\n" % (successes, mean_rewards))
                 x.append(i)
+                success_eval.append(successes)
                 val_mean_rewards.append(mean_rewards)
                 val_std_rewards.append(std_rewards)
+            if i % 500 == 0:
+                self.plot_graph(success_eval, suffix+'_Episode_success', 'Episodes', 'Evaluaton Success')
+                self.plot_graph(train_rewards, suffix+'_Episode_rewards', 'Episodes', 'Training Rewards')
+                self.plot_graph(train_loss, suffix+'_Training_loss', 'Episodes', 'Training Loss')
+                self.plot_errorbar(x, val_mean_rewards, val_std_rewards, suffix+'_mean_val_rewards', 'Episodes', 'Val Rewards', label='std')
 
-        self.model.save_weights(os.path.join(self.OUTPUT_PATH, suffix+'_model.h5'))
 
-        self.plot_graph(train_rewards, suffix+'_Episode_rewards', 'Episodes', 'Training Rewards')
-        self.plot_graph(train_loss, suffix+'_Training_loss', 'Episodes', 'Training Loss')
-        self.plot_errorbar(x, val_mean_rewards, val_std_rewards, suffix+'_mean_val_rewards', 'Episodes', 'Val Rewards', label='std')
-
+        pdb.set_trace()
+        self.actor.target_model.save_weights(os.path.join(self.OUTPUT_PATH, suffix+'_actor_model.h5'))
+        self.critic.target_model.save_weights(os.path.join(self.OUTPUT_PATH, suffix+'_critic_model.h5'))
+        
 
 
     def add_hindsight_replay_experience(self, states, actions):

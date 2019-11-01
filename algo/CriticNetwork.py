@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Input, Concatenate,add
+from tensorflow.keras.layers import Dense, Input, concatenate,add
 from tensorflow.keras import layers
 from tensorflow.keras.optimizers import Adam
 import pdb
@@ -25,11 +25,12 @@ def create_critic_network(state_size, action_size, learning_rate):
     action_input = Input(shape=[action_size])
 
     x1 = Dense(HIDDEN1_UNITS, activation = 'relu')(state_input)
-    x2 = Dense(HIDDEN1_UNITS, activation = 'linear')(action_input)
-    y = Dense(HIDDEN2_UNITS, activation = 'linear')(x1)
-    h1 = add([y,x2])
+    x2 = Dense(HIDDEN1_UNITS, activation = 'relu')(action_input)
+    # y = Dense(HIDDEN2_UNITS, activation = 'linear')(x1)
+    # h1 = add([y,x2])
+    h1 = concatenate([x1,x2])
     h2 = Dense(HIDDEN2_UNITS, activation = 'relu')(h1)
-    value = Dense(1, activation = 'linear')(h2)
+    value = Dense(1)(h2)
     
     model = tf.keras.Model(inputs=[state_input, action_input], outputs=value)
     model.compile(loss="mse", optimizer=Adam(lr=learning_rate))
@@ -75,12 +76,17 @@ class CriticNetwork(object):
         grads = self.sess.run(self.action_grads, feed_dict={
             self.state_input: states,
             self.action_input: actions
-        })
+        })[0]
         return grads
         # raise NotImplementedError
 
     def update_target(self):
         """Updates the target net using an update rate of tau."""
+        # for i in range(len(self.model.trainable_weights)):
+        #     weights = self.model.trainable_weights[i]
+        #     target_weights = self.target_model.trainable_weights[i]
+        #     # target_weights = self.tau * weights + (1 - self.tau)* target_weights
+        #     self.sess.run(tf.assign(target_weights, self.tau * weights + (1 - self.tau)* target_weights))
         weights = self.model.get_weights()
         target_weights = self.target_model.get_weights()
         for i in range(len(weights)):
