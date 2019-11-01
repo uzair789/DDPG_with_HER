@@ -292,7 +292,26 @@ class DDPG(object):
             states: a list of states.
             actions: a list of states.
         """
-        raise NotImplementedError
+        # compute the rewards for the current goal
+        states_ser, rewards_ser = self.env.apply_hindsight(states)
+
+        # we now have the states,rewards and actions to add to the buffer. I think there will be one action less than the st        # ates and rewards
+        self.add_to_buffer(states_ser, rewards_ser, actions)
+        
+        '''
+        # we sample additional goals (-future, episode, random)
+        additional_goals = sample_additional_goals(states, actions, strategy='future')
+
+
+        # get sets of states and rewards for each goal and add to the buffer
+        for g in additional_goals:
+            states[-1] = g
+            states_her, rewards_her = self.env.apply_hindsight(states)
+
+            # add the additional transitions to the buffer
+            self.add_to_buffer(states_her, rewards_her, actions)
+        '''
+
 
 
 if __name__ == '__main__':
