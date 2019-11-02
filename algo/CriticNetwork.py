@@ -25,12 +25,12 @@ def create_critic_network(state_size, action_size, learning_rate):
     action_input = Input(shape=[action_size])
 
     x1 = Dense(HIDDEN1_UNITS, activation = 'relu')(state_input)
-    x2 = Dense(HIDDEN1_UNITS, activation = 'relu')(action_input)
+    x2 = Dense(HIDDEN2_UNITS, activation = 'relu')(action_input)
     # y = Dense(HIDDEN2_UNITS, activation = 'linear')(x1)
     # h1 = add([y,x2])
     h1 = concatenate([x1,x2])
     h2 = Dense(HIDDEN2_UNITS, activation = 'relu')(h1)
-    value = Dense(1)(h2)
+    value = Dense(1, activation = 'linear')(h2)
     
     model = tf.keras.Model(inputs=[state_input, action_input], outputs=value)
     model.compile(loss="mse", optimizer=Adam(lr=learning_rate))

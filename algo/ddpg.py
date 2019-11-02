@@ -132,6 +132,7 @@ class DDPG(object):
                 if i == 8:
                     # Comment out the line below to disable plotting.
                     plt.savefig(os.path.join(self.OUTPUT_PATH,'plots','ep'+str(episode)+'_'+str(num_episodes)+'.png'))
+                    plt.close()
         return np.mean(success_vec), np.mean(test_rewards), np.std(test_rewards)
     
     def burn_in_memory(self):
@@ -189,6 +190,7 @@ class DDPG(object):
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.savefig(os.path.join(self.OUTPUT_PATH,title+'.png'))
+        plt.close()
 
     def plot_errorbar(self,x, y, yerr, title, xlabel, ylabel, label=None):
         plt.figure(figsize=(12,5))
@@ -197,6 +199,7 @@ class DDPG(object):
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.savefig(os.path.join(self.OUTPUT_PATH, title+'.png'))
+        plt.close()
 
     def train(self, num_episodes, hindsight=False):
         """Runs the DDPG algorithm.
@@ -215,7 +218,7 @@ class DDPG(object):
         val_mean_rewards = []
         val_std_rewards = []
         success_eval = []
-        self.burn_in_memory()
+        # self.burn_in_memory()
         for i in range(num_episodes):
             state = self.env.reset()
             s_t = np.array(state)
