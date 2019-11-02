@@ -313,8 +313,9 @@ class DDPG(object):
             states: a list of states.
             actions: a list of states.
         """
+        states_copy = np.copy(states)
         # compute the rewards for the current goal
-        states_ser, rewards_ser = self.env.apply_hindsight(states)
+        states_ser, rewards_ser = self.env.apply_hindsight(states_copy)
 
         # we now have the states,rewards and actions to add to the buffer. I think there will be one action less than the st        # ates and rewards
         self.add_to_buffer(states_ser, rewards_ser, actions)
