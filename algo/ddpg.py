@@ -132,6 +132,7 @@ class DDPG(object):
                 if i == 8:
                     # Comment out the line below to disable plotting.
                     plt.savefig(os.path.join(self.OUTPUT_PATH,'plots','ep'+str(episode)+'_'+str(num_episodes)+'.png'))
+                    plt.close()
         return np.mean(success_vec), np.mean(test_rewards), np.std(test_rewards)
     
     def burn_in_memory(self):
@@ -153,7 +154,14 @@ class DDPG(object):
         print(transition_count)
     
     def get_training_data(self,batch):
-        states = np.array([x for x in batch[:,0]])
+
+        test = []
+        for x in batch[:,0]:
+            if len(np.shape(x))<2:
+                x=np.expand_dims(x,axis=0)
+            test.append(x)
+        test = np.array(test)
+        states = np.array([x for x in test])
         actions = np.array([x for x in batch[:, 1]])
         rewards = np.array([x for x in batch[:, 2]])
         new_states = np.array([x for x in batch[:, 3]])
@@ -162,6 +170,8 @@ class DDPG(object):
         # states = np.array(states,ndim = 2)
         # actions = np.array(actions,ndim = 2)
         # new_states = np.array(new_states,ndim = 2)
+        #print(np.shape(states),np.shape(actions),np.shape(rewards),np.shape(dones))
+        #print(np.shape(states),"**")
         states = np.squeeze(states,axis = 1)
         dones = np.expand_dims(dones,axis = 1)
         rewards = np.expand_dims(rewards,axis = 1)
@@ -189,7 +199,7 @@ class DDPG(object):
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.savefig(os.path.join(self.OUTPUT_PATH,title+'.png'))
-
+        plt.close()
     def plot_errorbar(self,x, y, yerr, title, xlabel, ylabel, label=None):
         plt.figure(figsize=(12,5))
         plt.title(title)
@@ -197,6 +207,13 @@ class DDPG(object):
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.savefig(os.path.join(self.OUTPUT_PATH, title+'.png'))
+    
+    def add_to_buffer(self, states, rewards, actions):
+        done = False
+        for t in range(len(actions)):
+            if t == len(actions)-1:
+                done = True
+            self.replay_mem.add(states[t], actions[t], rewards[t], states[t+1], done)
 
     def train(self, num_episodes, hindsight=True):
         """Runs the DDPG algorithm.
@@ -215,7 +232,7 @@ class DDPG(object):
         val_mean_rewards = []
         val_std_rewards = []
         success_eval = []
-        self.burn_in_memory()
+        #self.burn_in_memory()
         for i in range(num_episodes):
             state = self.env.reset()
             s_t = np.array(state)
@@ -231,7 +248,8 @@ class DDPG(object):
                 action = act + self.sample_noise(act)
                 action = np.squeeze(action, axis = 0)
                 next_state, reward, done, info = self.env.step(action)
-                store_states.append(state)
+                #print(state,np.shape(state))
+                store_states.append(np.squeeze(state.T,axis=1))
                 store_actions.append(action)
                 self.replay_mem.add(state = state, action = action, reward = reward, new_state = next_state, done = done)
                 state = next_state
@@ -239,6 +257,7 @@ class DDPG(object):
                 step += 1  
                 # temp = tf.keras.losses.MSE(critic_targets,q_val)
                 batch =np.array(self.replay_mem.get_batch(batch_size = BATCH_SIZE))
+                #print("batch",np.shape(batch[:,0]),batch[:,0])
                 states,actions,critic_targets,q_val = self.get_training_data(batch)
                 temp = self.update_models(states,actions,critic_targets)
                 # temp = self.sess.run(
@@ -250,7 +269,9 @@ class DDPG(object):
 
             if hindsight:
                 # For HER, we also want to save the final next_state.
-                store_states.append(new_s)
+                #next_state = np.expand_dims(next_state,axis=0)
+                #print(np.shape(next_state),next_state)
+                store_states.append(next_state)
                 self.add_hindsight_replay_experience(store_states,
                                                      store_actions)
             
@@ -279,7 +300,7 @@ class DDPG(object):
                 self.plot_errorbar(x, val_mean_rewards, val_std_rewards, suffix+'_mean_val_rewards', 'Episodes', 'Val Rewards', label='std')
 
 
-        pdb.set_trace()
+        #pdb.set_trace()
         self.actor.target_model.save_weights(os.path.join(self.OUTPUT_PATH, suffix+'_actor_model.h5'))
         self.critic.target_model.save_weights(os.path.join(self.OUTPUT_PATH, suffix+'_critic_model.h5'))
         
@@ -297,7 +318,11 @@ class DDPG(object):
 
         # we now have the states,rewards and actions to add to the buffer. I think there will be one action less than the st        # ates and rewards
         self.add_to_buffer(states_ser, rewards_ser, actions)
-        
+        #for i in range(len(states_ser)):
+
+
+
+
         '''
         # we sample additional goals (-future, episode, random)
         additional_goals = sample_additional_goals(states, actions, strategy='future')
