@@ -66,19 +66,13 @@ class ActorNetwork(object):
             self.state_input: states,
             self.action_grads: action_grads
         })
-        # raise NotImplementedError
+
 
     def update_target(self):
         """Updates the target net using an update rate of tau."""
-        # for i in range(len(self.model.trainable_weights)):
-        #     weights = self.model.trainable_weights[i]
-        #     target_weights = self.target_model.trainable_weights[i]
-        #     # target_weights = self.tau * weights + (1 - self.tau)* target_weights
-        #     self.sess.run(tf.assign(target_weights, self.tau * weights + (1 - self.tau)* target_weights))
-        # pdb.set_trace()
         weights = self.model.get_weights()
         target_weights = self.target_model.get_weights()
         for i in range(len(weights)):
             target_weights[i] = self.tau * weights[i] + (1 - self.tau)* target_weights[i]
         self.target_model.set_weights(target_weights)
-        # raise NotImplementedError
+

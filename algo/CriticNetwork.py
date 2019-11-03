@@ -20,14 +20,12 @@ def create_critic_network(state_size, action_size, learning_rate):
         state_input: a tf.placeholder for the batched state.
         action_input: a tf.placeholder for the batched action.
     """
-    # raise NotImplementedError
     state_input = Input(shape=[state_size])
     action_input = Input(shape=[action_size])
 
     x1 = Dense(HIDDEN1_UNITS, activation = 'relu')(state_input)
     x2 = Dense(HIDDEN2_UNITS, activation = 'relu')(action_input)    
-    # y = Dense(HIDDEN2_UNITS, activation = 'linear')(x1)
-    # h1 = add([y,x2])
+
     h1 = concatenate([x1,x2])
     h2 = Dense(HIDDEN2_UNITS, activation = 'relu')(h1)
     value = Dense(1, activation = 'linear')(h2)
@@ -52,7 +50,6 @@ class CriticNetwork(object):
             tau: (float) the target net update rate.
             learning_rate: (float) learning rate for the critic.
         """
-        # raise NotImplementedError
         self.model, self.state_input, self.action_input = create_critic_network(state_size, action_size,learning_rate)
         self.target_model,_ ,_= create_critic_network(state_size, action_size,learning_rate) 
         self.batch_size = batch_size
@@ -78,7 +75,7 @@ class CriticNetwork(object):
             self.action_input: actions
         })[0]
         return grads
-        # raise NotImplementedError
+
 
     def update_target(self):
         """Updates the target net using an update rate of tau."""
@@ -92,5 +89,5 @@ class CriticNetwork(object):
         for i in range(len(weights)):
             target_weights[i] = self.tau * weights[i] + (1 - self.tau)* target_weights[i]
         self.target_model.set_weights(target_weights)
-        # raise NotImplementedError
+
 
